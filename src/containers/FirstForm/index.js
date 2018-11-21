@@ -1,59 +1,85 @@
+/*
+  TODO: Have reactive form validations
+*/
+
 import React from 'react';
+import { connect } from 'react-redux'
+import { updateFirstForm } from '../../actions';
 import TextField from '../../components/TextField';
 import DropDown from '../../components/DropDown';
+import DatePicker from '../../components/DatePicker';
+import { getCategoryList } from '../../apiService';
+import { THIS_DAY } from '../../helper';
 
 
-const formConfig = [
-    {
+const formConfig = {
+    name: {
         label: 'Name',
-        id: 'name',
         required: true,
         pattern: /^([a-zA-Z0-9]){3,13}$/,
         fieldType: 'text',
     },
-    {
+    age: {
         label: 'Age',
-        id: 'age',
         required: true,
         fieldType: 'number',
         minValue: 1,
         maxValue: 100,
         maxLength: 3,
     },
-    {
+    phone: {
         label: 'Phone',
-        id: 'phone',
         required: true,
         fieldType: 'number',
         pattern: /^([0-9]){10}$/,
     },
-];
+};
 
 class FirstForm extends React.Component {
     constructor(props){
         super(props);
-        const initialForm = ['name', 'age'];
+        const textfieldsToShow = ['name', 'age'];
         const formState = {};
-        formConfig.forEach((formField) => {
-            formState[formField.id] = {
-                value: '',
+        const { formData }  =this.props.appReducer;
+        Object.keys(formConfig).forEach((formField) => {
+            formState[formField] = {
+                value: formData[formField] || '',
                 error: '',
             }
         })
         this.state = {
             ...formState,
-            initialForm,
+            textfieldsToShow,
+            categoryIndex: 0,
+            productIndex: 0,
+            instanceDate: formData.instanceDate,
+            instanceDateError: '',
             categoryDropDown: [],
         };
     }
 
     componentDidMount = () => {
-        fetch('http://www.mocky.io/v2/5b6555f53300001000f6a9d3')
-        .then((response) =>response.json())
-        .then((parsedJSON) => {
-            console.log('parsedJSON: ', parsedJSON);
-            this.setState({ categoryDropDown: parsedJSON.categories })
-        })
+        getCategoryList().then((categoryData) => {
+            const { categories, products } = categoryData;
+            const productsObj = {};
+            products.forEach((product) => {
+                const {categoryId} = product
+                if (productsObj[categoryId]) {
+                    productsObj[categoryId].push(product);
+                } else {
+                    productsObj[categoryId] = [product]
+                }
+            });
+            const formattedCategories = categories.map((category) => {
+                const formattedCategory = {...category, products: productsObj[category.id]};
+                return formattedCategory;
+            });
+            const { formData }  =this.props.appReducer;
+            const selectedCategoryIndex = formattedCategories.findIndex((category) => category.id === formData.selectedCategoryId);
+            const selectedProductIndex = formattedCategories[selectedCategoryIndex] && formattedCategories[selectedCategoryIndex].products.findIndex((product) => product.id === formData.selectedProductId);
+            const categoryIndex = selectedCategoryIndex === -1 ? 0 : selectedCategoryIndex;
+            this.setState({categoryDropDown: formattedCategories, categoryIndex, productIndex:  selectedProductIndex || 0})
+        });
     }
     preventDefault = (event) => {
         event.preventDefault();
@@ -72,32 +98,42 @@ class FirstForm extends React.Component {
         if (fieldId === 'age') {
           let val = parseInt(value, 10);
           if (val < 18) {
-              this.setState(({initialForm}) => {
-                  if (initialForm.includes('phone')) {
-                      return {initialForm};
+              this.setState(({textfieldsToShow}) => {
+                  if (textfieldsToShow.includes('phone')) {
+                      return {textfieldsToShow};
                   }
-                  const newForm = [...initialForm, 'phone'];
-                  return {initialForm: newForm}
+                  const newForm = [...textfieldsToShow, 'phone'];
+                  return {textfieldsToShow: newForm}
               })
           } else {
-            this.setState(({initialForm}) => {
-                if (!initialForm.includes('phone')) {
-                    return {initialForm};
+            this.setState(({textfieldsToShow}) => {
+                if (!textfieldsToShow.includes('phone')) {
+                    return {textfieldsToShow};
                 }
-                    const index = initialForm.indexOf('phone');
+                    const index = textfieldsToShow.indexOf('phone');
                     if (index > -1) {
-                        initialForm.splice(index, 1);
+                        textfieldsToShow.splice(index, 1);
                     }
                     // array = [2, 9]
-                const newForm = [...initialForm];
-                return {initialForm: newForm}
+                const newForm = [...textfieldsToShow];
+                return {textfieldsToShow: newForm}
             })
           }   
         }
     }
 
-    validateField = (formField) => {
-        const fieldId = formField.id;
+    onDropDownChange = (selectedIndex, fieldId) => {
+        this.setState((state) => {
+            const newState = {...state};
+            newState[fieldId] = selectedIndex;
+            if (fieldId === 'categoryIndex') {
+                newState.productIndex = 0;
+            }
+            return newState;
+        })
+    }
+
+    validateField = (formField, fieldId) => {
         const fieldState = this.state[fieldId];
         let value =  fieldState.value;
         if (formField.pattern) {
@@ -109,12 +145,22 @@ class FirstForm extends React.Component {
         }
         return true
     }
+
+    validateDate = (fieldId, value) => {
+        if (fieldId === 'instanceDate') {
+            const thisDayTime = THIS_DAY.getTime();
+            const instanceDateTime = value.getTime();
+            return instanceDateTime <= thisDayTime;
+        }
+        return true
+    }
     submitForm = () => {
-        let isFormValid = true;
-        this.state.initialForm.forEach((formField) => {
-            const fieldId = formField.id;
+        const isInstanceDateValid = this.validateDate('instanceDate', this.state.instanceDate);
+        let isFormValid = isInstanceDateValid;
+        this.state.textfieldsToShow.forEach((fieldId) => {
+            const formField = formConfig[fieldId]
             const fieldState = this.state[fieldId];
-            const isFieldValid = this.validateField(formField);
+            const isFieldValid = this.validateField(formField, fieldId);
             isFormValid = isFormValid && isFieldValid;
             if (!isFieldValid) {
                 this.setState((state) => {
@@ -128,21 +174,36 @@ class FirstForm extends React.Component {
                 })
             }
         });
-
+        if (!isInstanceDateValid) {
+            this.setState({ instanceDateError: 'Should be not be a future date' });
+        }
         if (isFormValid) {
-            console.log('isFormValid: ', isFormValid);
+            const formData = this.getFormData();
+            this.props.updateFirstForm(formData);
+            this.props.history.push('/second-form/')
         }
     }
-    render(){
-        const { name } = this.state;
-        const formsList = this.state.initialForm.map((fieldId) => {
-            const formObj = formConfig.find((obj) => obj.id === fieldId);
-            return formObj;
-        })
-        const textFields = formsList.map((formField) => {
-            const fieldId = formField.id;
+
+    getFormData = () => {
+        const formData = {};
+        const { textfieldsToShow, categoryDropDown, categoryIndex, productIndex } = this.state;
+        textfieldsToShow.forEach((fieldId) => {
             const fieldState = this.state[fieldId];
-            console.log('fieldState: ', fieldState);
+            formData[fieldId] = fieldState.value;
+        });
+        formData.selectedCategoryId = categoryDropDown[categoryIndex].id
+        formData.selectedProductId = categoryDropDown[categoryIndex].products[productIndex].id
+        return formData;
+    }
+    onDateChange = (date) => {
+        this.setState({ instanceDate: date, instanceDateError: '' });
+    }
+    render(){
+        const { textfieldsToShow, categoryDropDown, categoryIndex, productIndex } = this.state;
+        const productsOption = categoryDropDown[categoryIndex] && categoryDropDown[categoryIndex].products;
+        const textFields = textfieldsToShow.map((fieldId) => {
+            const formField = formConfig[fieldId];
+            const fieldState = this.state[fieldId];
             return (
                 <TextField
                     key={fieldId}
@@ -156,15 +217,39 @@ class FirstForm extends React.Component {
                 />
             );
         })
-        console.log('name: ', name);
         return (
             <form onSubmit={this.preventDefault}>
+            <h1>First Form</h1>
             {textFields}
-            <DropDown
-                id={'categoryDropDown'}
-                onChange={this.onChange}
-                options={this.state.categoryDropDown}
-                selectedId={1}
+            <div className="dropdown-wrap">
+                <label>Select Category</label>
+                <DropDown
+                    id={'categoryIndex'}
+                    onChange={this.onDropDownChange}
+                    options={categoryDropDown}
+                    selectedIndex={categoryIndex}
+                    
+                />
+            </div>
+            {
+                productsOption
+                ? 
+                <div className="dropdown-wrap">
+                    <label>Select Product</label>
+                    <DropDown
+                        id={'productIndex'}
+                        onChange={this.onDropDownChange}
+                        options={productsOption}
+                        selectedIndex={productIndex}
+                    />
+                </div>
+                :  null
+            }
+            <DatePicker
+                onDateChange={this.onDateChange}
+                value={this.state.instanceDate}
+                label={'Instance Date'}
+                error={this.state.instanceDateError}
             />
                 <button type="submit" onClick={this.submitForm} >Submit </button>
             </form>
@@ -172,4 +257,19 @@ class FirstForm extends React.Component {
     }
 }
 
-export default FirstForm;
+
+
+const mapStateToProps = state => ({
+    appReducer: state.appReducer,
+  })
+  
+  const mapDispatchToProps = dispatch => ({
+    updateFirstForm: (id) => dispatch(updateFirstForm(id))
+  })
+  
+  
+  export default connect(
+    mapStateToProps,
+    mapDispatchToProps
+  )(FirstForm)
+  

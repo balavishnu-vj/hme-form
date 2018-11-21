@@ -1,39 +1,28 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux'
-import { BrowserRouter as Router, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Route } from "react-router-dom";
 import { testAction } from './actions';
 import FirstForm from './containers/FirstForm';
+import SecondForm from './containers/SecondForm';
 
 import './App.css';
-
-const Index = () => <h2>Home</h2>;
-const About = () => <h2>About</h2>;
-const Users = () => <h2>Users</h2>;
 
 class App extends Component {
   render() {
     return (
       <Router>
     <div>
-      <nav>
-        <ul>
-          <li>
-            <Link to="/">FirstForm</Link>
-          </li>
-          <li>
-            <Link to="/about/">About</Link>
-          </li>
-        </ul>
-      </nav>
-
       <Route path="/" exact component={FirstForm} />
-      <Route path="/about/" component={About} />
+      <Route path="/second-form/" component={SecondForm} />
     </div>
   </Router>
     );
   }
 }
 
+/*
+  TODO: Have different reducer for app and forms. But here there is no global app state to main to used.
+*/
 const mapStateToProps = state => ({
   appReducer: state.appReducer,
 })

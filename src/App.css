@@ -30,3 +30,26 @@
     transform: rotate(360deg);
   }
 }
+
+form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+button {
+  margin-top: 2em;
+  padding: 1em 2em;
+}
+
+.text-field {
+  padding: 0.5em;
+}
+
+.text-field > label {
+  padding-right: 0.5em;
+}
+
+.dropdown-wrap {
+  padding: 0.5em;
+}

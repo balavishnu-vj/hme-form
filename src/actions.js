@@ -5,3 +5,16 @@ export function testAction(data) {
       data,
     };
   }
+
+  export function updateFirstForm(data) {
+    return {
+      type: C.UPDATE_FIRST_FORM_DATA,
+      data,
+    };
+  }
+
+  export function resetForm() {
+    return {
+      type: C.RESET_FORM_DATA,
+    };
+  }

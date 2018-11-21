@@ -1,3 +1,7 @@
+/*
+  TODO: Use compponent Based styling
+*/
+
 import React from 'react';
 
 export default function TextField(props) {
@@ -5,7 +9,7 @@ export default function TextField(props) {
         props.onChange(event.target.value, props.id);
     }
     return (
-        <div>
+        <div className="text-field">
             <label>{props.label}</label>
             <input
                 id={props.id}
